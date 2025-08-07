@@ -1,26 +1,28 @@
 import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModelForCausalLM
-
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import numpy as np
 
 class SentimentAnalyzer:
-    def __init__(self, model_name="tabularisai/multilingual-sentiment-analysis"):
+    def __init__(self, model_name="cardiffnlp/twitter-xlm-roberta-base-sentiment"):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForSequenceClassification.from_pretrained(model_name)
         self.labels = ["Negative", "Neutral", "Positive"]
 
     def predict(self, text: str) -> str:
-        encoded_input = self.tokenizer(text, return_tensors='pt', truncation=True, padding=True, max_length=512)
+        encoded_input = self.tokenizer(text, return_tensors='pt')
         with torch.no_grad():
-            outputs = self.model(**encoded_input)
-        probabilities = torch.nn.functional.softmax(outputs.logits, dim=-1)
-        sentiment_map = {0: "Negative", 1: "Negative", 2: "Neutral", 3: "Positive", 4: "Positive"}
-        return [sentiment_map[p] for p in torch.argmax(probabilities, dim=-1).tolist()][0]
-    
+            output = self.model(**encoded_input)
+        scores = output.logits[0].detach().numpy()
+        scores = np.exp(scores) / np.sum(np.exp(scores)) 
+        predicted_class = np.argmax(scores)
+        return self.labels[predicted_class]
+
 class LLMSentimentAnalyzer:
   def __init__(self, model_name="google/gemma-2b-it"):
     self.device = "cuda" if torch.cuda.is_available() else "cpu"
     self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-    self.model = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True, device_map="auto")
+    # Load the model in 8-bit to reduce memory usage
+    self.model = AutoModelForCausalLM.from_pretrained(model_name).to(self.device)
     self.labels = ["Negative", "Neutral", "Positive"]
 
   def get_prompt(self, text: str) -> str:
