@@ -82,11 +82,6 @@ Response:
 
 ---
 
-## 🐳 Docker Notes
-
-* This repo includes a `Dockerfile` for easy containerization.
-* Both the backend and frontend can be run in containers.
-* You can push the image to Docker Hub if needed.
 
 
 ## Contact
