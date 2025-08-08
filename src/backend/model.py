@@ -1,5 +1,5 @@
 import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModelForCausalLM, BitsAndBytesConfig
 
 
 class SentimentAnalyzer:
@@ -17,59 +17,75 @@ class SentimentAnalyzer:
         return [sentiment_map[p] for p in torch.argmax(probabilities, dim=-1).tolist()][0]
     
 class LLMSentimentAnalyzer:
-  def __init__(self, model_name="google/gemma-2b-it"):
-    self.device = "cuda" if torch.cuda.is_available() else "cpu"
-    self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-    self.model = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True, device_map="auto")
-    self.labels = ["Negative", "Neutral", "Positive"]
+    def __init__(self, model_name="google/gemma-2b-it"):
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            torch_dtype=torch.bfloat16,
+            quantization_config=BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_compute_dtype=torch.float16,
+            ),
+            trust_remote_code=True,
+            device_map="auto"
+        )
+        self.labels = ["Negative", "Neutral", "Positive"]
 
-  def get_prompt(self, text: str) -> str:
-      prompt = f"""
-      You are a sentiment analysis assistant for customer service calls. Your task is to classify the sentiment of the given call summary in Arabic or English.
+    def get_prompt(self, text: str) -> str:
+        prompt = f"""
+        You are a sentiment analysis assistant for customer service calls. Your task is to classify the sentiment of the given call summary in Arabic or English.
 
-      Please consider the tone, language, and content of the summary when making your classification. You must choose one of the following:
-      - Positive
-      - Neutral
-      - Negative
+        Please consider the tone, language, and content of the summary when making your classification. You must choose one of the following:
+        - Positive
+        - Neutral
+        - Negative
 
-      Here are some examples to make your classification:
+        Here are some examples to make your classification:
 
-      Example 1:
-      Text: The customer was experiencing an issue with the laptop that has not been resolved yet after several attempts, and an appointment was scheduled to follow up on the case next Sunday.
-      Sentiment: Negative
+        Example 1:
+        Text: The customer was experiencing an issue with the laptop that has not been resolved yet after several attempts, and an appointment was scheduled to follow up on the case next Sunday.
+        Sentiment: Negative
 
-      Example 2:
-      Text: تواصل العميل مع مركز خدمة العمالء للحصول على شهادة رصيد حسابها. تم توجيهها إلى الموقع اإللكتروني للبنك إلصدار الشهادة وتوجيهها إلى جهة معينة
-      Sentiment: Neutral
+        Example 2:
+        Text: تواصل العميل مع مركز خدمة العمالء للحصول على شهادة رصيد حسابها. تم توجيهها إلى الموقع اإللكتروني للبنك إلصدار الشهادة وتوجيهها إلى جهة معينة
+        Sentiment: Neutral
 
-      Example 3:
-      Text: كان العميل يواجه صعوبة في سماع الوكيل أثناء المكالمة بسبب انخفاض مستوى الصوت. وافق الوكيل على إرسال رسالة نصية عبر تطبيق واتساب وأبدى العميل امتنانه بينما ينتظر اتصاالً معاوداً
-      Sentiment: Positive
-      Your classification should be based solely on the content of the call summary. Do not make any assumptions or inferences beyond what is explicitly stated.
+        Example 3:
+        Text: كان العميل يواجه صعوبة في سماع الوكيل أثناء المكالمة بسبب انخفاض مستوى الصوت. وافق الوكيل على إرسال رسالة نصية عبر تطبيق واتساب وأبدى العميل امتنانه بينما ينتظر اتصاالً معاوداً
+        Sentiment: Positive
+        Your classification should be based solely on the content of the call summary. Do not make any assumptions or inferences beyond what is explicitly stated.
 
-      Classify the sentiment of the following call summary:
+        Classify the sentiment of the following call summary:
 
-      {text}
+        {text}
 
-      Answer: """
+        Answer: """
 
-      return prompt
+        return prompt
 
-  def extract_sentiment(self, output: str) -> str:
-    lines = output.splitlines()
-    last_line = lines[-1]
-    for label in self.labels:
-      if label in last_line:
-        return label
-    return "Unknown"
+    def extract_sentiment(self, output: str) -> str:
+        lines = output.splitlines()
+        last_line = lines[-1]
+        for label in self.labels:
+            if label in last_line:
+                return label
+        return "Unknown"
 
-  def predict(self, text: str) -> str:
-    prompt = self.get_prompt(text)
-    input_ids = self.tokenizer(prompt, return_tensors="pt").to(self.device)
-    with torch.no_grad():
-      outputs = self.model.generate(**input_ids)
-    decoded_output = self.tokenizer.decode(outputs[0])
-    
-    sentiment_answer = self.extract_sentiment(decoded_output)
-    
-    return sentiment_answer
+    def predict(self, text: str) -> str:
+        prompt = self.get_prompt(text)
+        inputs = self.tokenizer(prompt, return_tensors="pt")
+        inputs = {k: v.to(self.model.device) for k, v in inputs.items()} 
+
+        with torch.no_grad():
+            outputs = self.model.generate(**inputs,
+            max_new_tokens=50,  # generates 50 new tokens after the prompt
+            do_sample=True,
+            top_p=0.9,
+            temperature=0.7)
+        decoded_output = self.tokenizer.decode(outputs[0])
+        
+        sentiment_answer = self.extract_sentiment(decoded_output)
+        
+        return sentiment_answer
