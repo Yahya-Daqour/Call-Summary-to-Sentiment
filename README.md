@@ -6,8 +6,8 @@ It provides:
 
 * ✅ Two models to choose from:
 
-  * `default`: A simple rule-based or traditional model
-  * `llm`: A small LLM-based classifier (e.g., Qwen or LLaMA 1B)
+  * `default`: A simple DNN classifier
+  * `llm`: A small LLM-based classifier (e.g., Gemma 2B)
 * 🌐 REST API using FastAPI
 * 🖥️ Web UI using Streamlit
 * 🐳 Docker support
