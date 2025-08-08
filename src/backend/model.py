@@ -80,10 +80,11 @@ class LLMSentimentAnalyzer:
 
         with torch.no_grad():
             outputs = self.model.generate(**inputs,
-            max_new_tokens=50,  # generates 50 new tokens after the prompt
+            max_new_tokens=5,
             do_sample=True,
             top_p=0.9,
-            temperature=0.7)
+            temperature=0.7
+            )
         decoded_output = self.tokenizer.decode(outputs[0])
         
         sentiment_answer = self.extract_sentiment(decoded_output)
