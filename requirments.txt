@@ -1,6 +1,9 @@
 fastapi
 uvicorn
 scipy
+torch==2.5.1
+torchaudio==2.5.1
+torchvision==0.20.1
 transformers==4.44.1
 sentencepiece
 protobuf
