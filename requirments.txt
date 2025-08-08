@@ -9,3 +9,4 @@ sentencepiece
 protobuf
 accelerate==0.25.0
 bitsandbytes
+streamlit
