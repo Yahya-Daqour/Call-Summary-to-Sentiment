@@ -27,13 +27,15 @@ docker build -t call-sentiment-analyzer .
 2. Run backend API:
 
 ```bash
-docker run -p 8000:8000 --gpus all -it --name call-sentiment-analyzer-container -v "$(pwd)":/app -w /app call-sentiment-analyzer /bin/bash
+docker run --gpus all -it --name call-sentiment-analyzer-container -v "$(pwd)":/app -w /app call-sentiment-analyzer /bin/bash
+uvicorn src.backend.main:app --reload
 ```
 
 3. (Optional) Run frontend UI:
 
 ```bash
-docker run -p 8501:8501 call-sentiment-analyzer streamlit run src/frontend/app.py
+docker exec -it call-sentiment-analyzer-container /bin/bash
+streamlit run src/frontend/app.py
 ```
 
 ---
