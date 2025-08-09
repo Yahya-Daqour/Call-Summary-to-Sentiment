@@ -27,7 +27,7 @@ docker build -t call-sentiment-analyzer .
 2. Run backend API:
 
 ```bash
-docker run -p 8000:8000 call-sentiment-analyzer
+docker run -p 8000:8000 --gpus all -it --name call-sentiment-analyzer-container -v "$(pwd)":/app -w /app call-sentiment-analyzer /bin/bash
 ```
 
 3. (Optional) Run frontend UI:
